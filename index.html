@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Fichaje QBV</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+  body{margin:0;background:#f3f5f9;color:#1d2433}
+  .wrap{max-width:440px;margin:0 auto;padding:20px 16px 40px}
+  h1{font-size:22px;margin:6px 0 2px}
+  .sub{color:#5b6475;font-size:14px;margin-bottom:18px}
+  .card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:14px}
+  label{display:block;font-size:13px;color:#5b6475;margin:10px 0 4px}
+  input,select{width:100%;font-size:17px;padding:12px;border:1px solid #d5dae3;border-radius:10px;background:#fff}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  button{font-size:16px;font-weight:600;padding:16px 8px;border:0;border-radius:12px;color:#fff;cursor:pointer}
+  .in{background:#1f8a4c}.out{background:#c0392b}.lo{background:#2f5fa7}.lr{background:#6b4fa3}
+  button:disabled{opacity:.5}
+  .msg{padding:14px;border-radius:12px;font-size:16px;display:none;margin-top:4px}
+  .ok{background:#e3f5ea;color:#145c32}.err{background:#fdeaea;color:#8a1f1f}.wait{background:#eef2f9;color:#2f3f5f}
+  .suc{font-size:18px;font-weight:700}
+  .foot{font-size:12px;color:#7a8394;text-align:center;margin-top:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Fichaje QBV</h1>
+  <div class="sub">Registrá tu ingreso y egreso. Necesitamos tu ubicación para confirmar que estás en la sucursal.</div>
+
+  <div class="card">
+    <label for="nombre">Nombre y apellido</label>
+    <input id="nombre" autocomplete="name" placeholder="Ej: Natalia Perez">
+    <label for="suc">Sucursal</label>
+    <select id="suc"><option value="">Cargando…</option></select>
+  </div>
+
+  <div class="card">
+    <div class="btns">
+      <button class="in" data-mov="Ingreso">Ingreso</button>
+      <button class="out" data-mov="Egreso">Egreso</button>
+      <button class="lo" data-mov="Salida a almorzar">Salgo a almorzar</button>
+      <button class="lr" data-mov="Regreso de almuerzo">Vuelvo del almuerzo</button>
+    </div>
+    <div id="msg" class="msg"></div>
+  </div>
+  <div id="ayuda" class="card" style="display:none">
+    <b>Cómo activar la ubicación</b>
+    <p style="margin:10px 0 4px"><b>iPhone</b></p>
+    <ol style="margin:0;padding-left:20px;line-height:1.5">
+      <li>Ajustes &gt; Privacidad y seguridad &gt; Localización: activala.</li>
+      <li>En esa lista, entrá a <b>Sitios web de Safari</b> (o a Chrome si usás Chrome) y elegí <b>Al usar la app</b>.</li>
+      <li>Volvé a esta pantalla y tocá de nuevo el botón. Si pregunta, tocá <b>Permitir</b>.</li>
+    </ol>
+    <p style="margin:10px 0 4px"><b>Android</b></p>
+    <ol style="margin:0;padding-left:20px;line-height:1.5">
+      <li>Bajá la barra de arriba y activá <b>Ubicación</b>.</li>
+      <li>En Chrome, tocá el candado o los ajustes junto a la dirección &gt; Permisos &gt; Ubicación: <b>Permitir</b>.</li>
+      <li>Volvé a tocar el botón.</li>
+    </ol>
+  </div>
+  <div class="foot">La hora la toma el sistema. Si el celular pregunta, tocá "Permitir ubicación".</div>
+</div>
+
+<script>
+var $ = function(id){return document.getElementById(id);};
+function show(t, cls){var m=$('msg'); m.className='msg '+cls; m.textContent=t; m.style.display='block';}
+function store(k,v){try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v);}catch(e){return null;}}
+$('nombre').value = store('fq_nombre') || '';
+
+var pre = '';
+function fill(list){
+  var s=$('suc'); s.innerHTML='<option value="">Elegí tu sucursal</option>';
+  list.forEach(function(x){var o=document.createElement('option'); o.value=x.n; o.textContent=x.n; s.appendChild(o);});
+  var want = pre || store('fq_suc') || '';
+  if (want) s.value = want;
+}
+var API = "https://script.google.com/macros/s/AKfycbyKcgUYjR8Gq9-d9gawu_-TKxkP42qI3levvLrp_5elh_IMGFnQ_MONfNtiDFn0Ytu5Wg/exec";
+var SUCS = ["Plaza Oeste","DOT Baires","Abasto","Quilmes","San Justo","Terrazas de Mayo"];
+pre = new URLSearchParams(location.search).get('s') || '';
+fill(SUCS.map(function(n){return {n:n};}));
+
+var busy=false;
+Array.prototype.forEach.call(document.querySelectorAll('button[data-mov]'), function(b){
+  b.addEventListener('click', function(){ go(b.getAttribute('data-mov')); });
+});
+function setBusy(v){busy=v; Array.prototype.forEach.call(document.querySelectorAll('button'),function(b){b.disabled=v;});}
+
+function go(mov){
+  if (busy) return;
+  var nombre=$('nombre').value.trim(), dni='', suc=$('suc').value;
+  if (!nombre || !suc){ show('Completá nombre y sucursal.','err'); return; }
+  store('fq_nombre',nombre); store('fq_suc',suc);
+  if (!navigator.geolocation){ show('Tu celular no permite compartir la ubicación desde acá.','err'); return; }
+  setBusy(true); show('Tomando tu ubicación…','wait');
+  navigator.geolocation.getCurrentPosition(function(p){
+    show('Registrando…','wait');
+    fetch(API, {method:'POST', body: JSON.stringify({nombre:nombre,dni:dni,sucursal:suc,mov:mov,lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy})})
+      .then(function(res){ return res.json(); })
+      .then(function(r){
+        setBusy(false);
+        if (r.ok) show('✔ '+mov+' registrado a las '+r.hora+' en '+suc+'.','ok');
+        else show(r.msg || ('No se registró: estás a '+r.dist+' m de '+suc+'. Fichá cuando estés en la sucursal.'),'err');
+      })
+      .catch(function(e){ setBusy(false); show('Error al registrar. Revisá tu conexión y probá de nuevo.','err'); });
+  }, function(err){
+    setBusy(false);
+    if(err.code===1){$('ayuda').style.display='block';$('ayuda').scrollIntoView({behavior:'smooth'});}
+    show(err.code===1 ? 'Sin permiso de ubicación no se puede fichar. Seguí los pasos de abajo.' : 'No pude obtener tu ubicación. Probá de nuevo al aire libre o con el GPS activado.','err');
+  }, {enableHighAccuracy:true, timeout:20000, maximumAge:0});
+}
+</script>
+</body>
+</html>
