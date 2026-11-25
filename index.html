@@ -31,6 +31,8 @@
   <div class="card">
     <label for="nombre">Nombre y apellido</label>
     <input id="nombre" autocomplete="name" placeholder="Ej: Natalia Perez">
+    <label for="pin">PIN (últimos 4 números de tu DNI)</label>
+    <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="••••">
     <label for="suc">Sucursal</label>
     <select id="suc"><option value="">Cargando…</option></select>
   </div>
@@ -67,6 +69,8 @@ var $ = function(id){return document.getElementById(id);};
 function show(t, cls){var m=$('msg'); m.className='msg '+cls; m.textContent=t; m.style.display='block';}
 function store(k,v){try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v);}catch(e){return null;}}
 $('nombre').value = store('fq_nombre') || '';
+$('pin').value = store('fq_pin') || '';
+var DEV = store('fq_dev'); if(!DEV){ DEV = 'd'+Date.now().toString(36)+Math.random().toString(36).slice(2,10); store('fq_dev', DEV); }
 
 var pre = '';
 function fill(list){
@@ -76,7 +80,7 @@ function fill(list){
   if (want) s.value = want;
 }
 var API = "https://script.google.com/macros/s/AKfycbyKcgUYjR8Gq9-d9gawu_-TKxkP42qI3levvLrp_5elh_IMGFnQ_MONfNtiDFn0Ytu5Wg/exec";
-var SUCS = ["Plaza Oeste","DOT Baires","Abasto","Quilmes","San Justo","Terrazas de Mayo"];
+var SUCS = ["Plaza Oeste","DOT Baires","Abasto","Quilmes","San Justo","Terrazas de Mayo","Lomas de Zamora","La Plata"];
 pre = new URLSearchParams(location.search).get('s') || '';
 fill(SUCS.map(function(n){return {n:n};}));
 
@@ -88,18 +92,18 @@ function setBusy(v){busy=v; Array.prototype.forEach.call(document.querySelectorA
 
 function go(mov){
   if (busy) return;
-  var nombre=$('nombre').value.trim(), dni='', suc=$('suc').value;
-  if (!nombre || !suc){ show('Completá nombre y sucursal.','err'); return; }
+  var nombre=$('nombre').value.trim(), pin=$('pin').value.replace(/\D/g,''), suc=$('suc').value;
+  if (!nombre || !suc || pin.length!=4){ show('Completá nombre, PIN y sucursal.','err'); return; }
   store('fq_nombre',nombre); store('fq_suc',suc);
   if (!navigator.geolocation){ show('Tu celular no permite compartir la ubicación desde acá.','err'); return; }
   setBusy(true); show('Tomando tu ubicación…','wait');
   navigator.geolocation.getCurrentPosition(function(p){
     show('Registrando…','wait');
-    fetch(API, {method:'POST', body: JSON.stringify({nombre:nombre,dni:dni,sucursal:suc,mov:mov,lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy})})
+    fetch(API, {method:'POST', body: JSON.stringify({nombre:nombre,pin:pin,dev:DEV,sucursal:suc,mov:mov,lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy})})
       .then(function(res){ return res.json(); })
       .then(function(r){
         setBusy(false);
-        if (r.ok) show('✔ '+mov+' registrado a las '+r.hora+' en '+suc+'.','ok');
+        if (r.ok) { store('fq_pin',pin); show('✔ '+(r.nombre?r.nombre+': ':'')+mov+' registrado a las '+r.hora+' en '+suc+'.','ok'); }
         else show(r.msg || ('No se registró: estás a '+r.dist+' m de '+suc+'. Fichá cuando estés en la sucursal.'),'err');
       })
       .catch(function(e){ setBusy(false); show('Error al registrar. Revisá tu conexión y probá de nuevo.','err'); });

@@ -89,12 +89,12 @@ function opciones(id,campo){var s=$(id),v=s.value,u={};DATA.forEach(function(d){
   s.length=1;Object.keys(u).sort().forEach(function(k){var o=document.createElement('option');o.value=o.textContent=k;s.appendChild(o)});s.value=u[v]?v:''}
 function filtrar(){
   var d1=$('fdesde').value,d2=$('fhasta').value,su=$('fsuc').value,pe=$('fper').value,mo=$('fmov').value,re=$('fres').value;
-  VISTA=DATA.filter(function(d){return (!d1||d.iso>=d1)&&(!d2||d.iso<=d2)&&(!su||d.suc==su)&&(!pe||d.persona==pe)&&(!mo||d.mov==mo)&&(!re||(re=='OK'?d.res=='OK':d.res!='OK'))});
+  VISTA=DATA.filter(function(d){return (!d1||d.iso>=d1)&&(!d2||d.iso<=d2)&&(!su||d.suc==su)&&(!pe||d.persona==pe)&&(!mo||d.mov==mo)&&(!re||(re=='OK'?d.res.indexOf('OK')==0:d.res.indexOf('OK')!=0))});
   var h='',per={},ok=0;
-  VISTA.forEach(function(d){per[d.persona]=1;if(d.res=='OK')ok++;
+  VISTA.forEach(function(d){per[d.persona]=1;if(d.res.indexOf('OK')==0)ok++;
     var m=d.ubic&&d.ubic.indexOf(',')>0?'<a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(d.ubic)+'">Ver</a>':'';
     var dist=Number(d.dist);var dt=isNaN(dist)?esc(d.dist):(dist>=1000?(dist/1000).toFixed(1)+' km':dist+' m');
-    h+='<tr><td>'+esc(d.fecha)+'</td><td>'+esc(d.hora)+'</td><td>'+esc(d.persona)+'</td><td>'+esc(d.suc)+'</td><td>'+esc(d.mov)+'</td><td class="'+(d.res=='OK'?'ok':'no')+'">'+(d.res=='OK'?'Válido':'Rechazado')+'</td><td>'+dt+'</td><td>'+esc(d.prec)+' m</td><td>'+m+'</td></tr>'});
+    h+='<tr><td>'+esc(d.fecha)+'</td><td>'+esc(d.hora)+'</td><td>'+esc(d.persona)+'</td><td>'+esc(d.suc)+'</td><td>'+esc(d.mov)+'</td><td class="'+(d.res.indexOf('OK')==0?'ok':'no')+'">'+(d.res=='OK'?'Válido':d.res.indexOf('OK')==0?'Válido · celular distinto':esc(d.res.replace('RECHAZADO: ','Rechazado: ')))+'</td><td>'+dt+'</td><td>'+esc(d.prec)+' m</td><td>'+m+'</td></tr>'});
   $('tb').innerHTML=h;$('vacio').style.display=VISTA.length?'none':'block';
   $('sTot').textContent=VISTA.length;$('sOk').textContent=ok;$('sNo').textContent=VISTA.length-ok;$('sPer').textContent=Object.keys(per).length;
 }
