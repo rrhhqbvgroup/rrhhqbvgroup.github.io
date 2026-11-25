@@ -80,7 +80,7 @@ function fill(list){
   if (want) s.value = want;
 }
 var API = "https://script.google.com/macros/s/AKfycbyKcgUYjR8Gq9-d9gawu_-TKxkP42qI3levvLrp_5elh_IMGFnQ_MONfNtiDFn0Ytu5Wg/exec";
-var SUCS = ["Plaza Oeste","DOT Baires","Abasto","Quilmes","San Justo","Terrazas de Mayo","Lomas de Zamora","La Plata"];
+var SUCS = ["Plaza Oeste","DOT Baires","Quilmes","San Justo","Terrazas de Mayo","Lomas de Zamora","La Plata"];
 pre = new URLSearchParams(location.search).get('s') || '';
 fill(SUCS.map(function(n){return {n:n};}));
 
