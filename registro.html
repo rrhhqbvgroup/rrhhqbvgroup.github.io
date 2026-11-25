@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Registro de fichajes QBV</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f3f5f9;color:#1d2433}
+header{background:#143c8c;color:#fff;padding:18px 24px}
+header h1{margin:0;font-size:22px}
+header p{margin:4px 0 0;opacity:.85;font-size:14px}
+main{padding:20px 24px;max-width:1300px;margin:0 auto}
+.card{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:16px;margin-bottom:16px}
+.filtros{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;align-items:end}
+label{display:block;font-size:12px;font-weight:600;color:#55607a;margin-bottom:4px;text-transform:uppercase;letter-spacing:.03em}
+input,select{width:100%;padding:9px 10px;border:1px solid #cfd6e4;border-radius:8px;font-size:14px;background:#fff}
+button{padding:10px 14px;border:0;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
+.pri{background:#143c8c;color:#fff}.sec{background:#e6ebf5;color:#143c8c}
+.stats{display:flex;gap:12px;flex-wrap:wrap}
+.stat{flex:1;min-width:140px;background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:14px 16px}
+.stat b{display:block;font-size:26px}.stat span{font-size:13px;color:#55607a}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;background:#eef2f9;padding:10px;font-size:12px;text-transform:uppercase;color:#55607a;white-space:nowrap;cursor:pointer}
+td{padding:9px 10px;border-top:1px solid #edf0f5;white-space:nowrap}
+.ok{color:#0a7a3e;font-weight:600}.no{color:#b3261e;font-weight:600}
+.msg{padding:12px;border-radius:8px;margin-top:10px;display:none}
+.err{background:#fde8e7;color:#8c1d18;display:block}
+#login{max-width:380px;margin:60px auto}
+.acciones{display:flex;gap:8px}
+a{color:#143c8c}
+</style>
+</head>
+<body>
+<header><h1>Registro de fichajes QBV</h1><p>Ingresos, egresos y almuerzos de las sucursales</p></header>
+
+<div id="login" class="card">
+  <label for="clave">Clave de acceso</label>
+  <input id="clave" type="password" autocomplete="current-password" placeholder="Clave de RRHH">
+  <div style="margin-top:12px"><button class="pri" onclick="entrar()" style="width:100%">Entrar</button></div>
+  <div id="lmsg" class="msg"></div>
+</div>
+
+<main id="app" style="display:none">
+  <div class="card filtros">
+    <div><label>Desde</label><input type="date" id="fdesde"></div>
+    <div><label>Hasta</label><input type="date" id="fhasta"></div>
+    <div><label>Sucursal</label><select id="fsuc"><option value="">Todas</option></select></div>
+    <div><label>Persona</label><select id="fper"><option value="">Todas</option></select></div>
+    <div><label>Movimiento</label><select id="fmov"><option value="">Todos</option></select></div>
+    <div><label>Resultado</label><select id="fres"><option value="">Todos</option><option value="OK">Válidos</option><option value="RECH">Rechazados</option></select></div>
+    <div class="acciones"><button class="sec" onclick="limpiar()">Limpiar</button><button class="sec" onclick="cargar()">Actualizar</button><button class="sec" onclick="csv()">Excel</button></div>
+  </div>
+  <div class="stats">
+    <div class="stat"><b id="sTot">0</b><span>Fichajes</span></div>
+    <div class="stat"><b id="sOk">0</b><span>Válidos</span></div>
+    <div class="stat"><b id="sNo">0</b><span>Rechazados</span></div>
+    <div class="stat"><b id="sPer">0</b><span>Personas</span></div>
+  </div>
+  <div class="card tablewrap" style="margin-top:16px">
+    <table><thead><tr>
+      <th>Fecha</th><th>Hora</th><th>Persona</th><th>Sucursal</th><th>Movimiento</th><th>Resultado</th><th>Distancia</th><th>Precisión GPS</th><th>Mapa</th>
+    </tr></thead><tbody id="tb"></tbody></table>
+    <div id="vacio" style="padding:20px;color:#55607a;display:none">No hay fichajes con esos filtros.</div>
+  </div>
+</main>
+
+<script>
+var API='https://script.google.com/macros/s/AKfycbyKcgUYjR8Gq9-d9gawu_-TKxkP42qI3levvLrp_5elh_IMGFnQ_MONfNtiDFn0Ytu5Wg/exec';
+var DATA=[], VISTA=[];
+function $(i){return document.getElementById(i)}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function iso(f){var p=String(f).split('/');return p.length==3?p[2]+'-'+('0'+p[1]).slice(-2)+'-'+('0'+p[0]).slice(-2):''}
+function nombre(n){return String(n||'').trim().toLowerCase().replace(/\s+/g,' ').replace(/(^|\s)\S/g,function(c){return c.toUpperCase()})}
+function entrar(){var c=$('clave').value.trim();if(!c)return;sessionStorage.setItem('qbv_clave',c);cargar()}
+function cargar(){
+  var c=sessionStorage.getItem('qbv_clave');if(!c)return;
+  fetch(API,{method:'POST',body:JSON.stringify({action:'listar',clave:c})}).then(function(r){return r.json()}).then(function(r){
+    if(!r.ok){sessionStorage.removeItem('qbv_clave');$('app').style.display='none';$('login').style.display='block';$('lmsg').className='msg err';$('lmsg').textContent=r.msg||'Clave incorrecta';return}
+    $('login').style.display='none';$('app').style.display='block';
+    DATA=r.rows.filter(function(x){return x[0]}).map(function(x){return {fecha:x[0],iso:iso(x[0]),hora:x[1],persona:nombre(x[2]),suc:x[4],mov:x[5],ubic:x[6],prec:x[7],dist:x[8],res:x[9]}});
+    DATA.sort(function(a,b){return (b.iso+b.hora).localeCompare(a.iso+a.hora)});
+    opciones('fsuc','suc');opciones('fper','persona');opciones('fmov','mov');filtrar();
+  }).catch(function(){$('lmsg').className='msg err';$('lmsg').textContent='No se pudo conectar. Probá de nuevo.'});
+}
+function opciones(id,campo){var s=$(id),v=s.value,u={};DATA.forEach(function(d){if(d[campo])u[d[campo]]=1});
+  s.length=1;Object.keys(u).sort().forEach(function(k){var o=document.createElement('option');o.value=o.textContent=k;s.appendChild(o)});s.value=u[v]?v:''}
+function filtrar(){
+  var d1=$('fdesde').value,d2=$('fhasta').value,su=$('fsuc').value,pe=$('fper').value,mo=$('fmov').value,re=$('fres').value;
+  VISTA=DATA.filter(function(d){return (!d1||d.iso>=d1)&&(!d2||d.iso<=d2)&&(!su||d.suc==su)&&(!pe||d.persona==pe)&&(!mo||d.mov==mo)&&(!re||(re=='OK'?d.res=='OK':d.res!='OK'))});
+  var h='',per={},ok=0;
+  VISTA.forEach(function(d){per[d.persona]=1;if(d.res=='OK')ok++;
+    var m=d.ubic&&d.ubic.indexOf(',')>0?'<a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(d.ubic)+'">Ver</a>':'';
+    var dist=Number(d.dist);var dt=isNaN(dist)?esc(d.dist):(dist>=1000?(dist/1000).toFixed(1)+' km':dist+' m');
+    h+='<tr><td>'+esc(d.fecha)+'</td><td>'+esc(d.hora)+'</td><td>'+esc(d.persona)+'</td><td>'+esc(d.suc)+'</td><td>'+esc(d.mov)+'</td><td class="'+(d.res=='OK'?'ok':'no')+'">'+(d.res=='OK'?'Válido':'Rechazado')+'</td><td>'+dt+'</td><td>'+esc(d.prec)+' m</td><td>'+m+'</td></tr>'});
+  $('tb').innerHTML=h;$('vacio').style.display=VISTA.length?'none':'block';
+  $('sTot').textContent=VISTA.length;$('sOk').textContent=ok;$('sNo').textContent=VISTA.length-ok;$('sPer').textContent=Object.keys(per).length;
+}
+function limpiar(){['fdesde','fhasta','fsuc','fper','fmov','fres'].forEach(function(i){$(i).value=''});filtrar()}
+function csv(){var l=[['Fecha','Hora','Persona','Sucursal','Movimiento','Resultado','Distancia (m)','Precision GPS (m)','Ubicacion']];
+  VISTA.forEach(function(d){l.push([d.fecha,d.hora,d.persona,d.suc,d.mov,d.res,d.dist,d.prec,d.ubic])});
+  var t=l.map(function(r){return r.map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"'}).join(';')}).join('\r\n');
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+t],{type:'text/csv;charset=utf-8'}));a.download='fichajes_qbv.csv';a.click()}
+['fdesde','fhasta','fsuc','fper','fmov','fres'].forEach(function(i){$(i).addEventListener('change',filtrar)});
+$('clave').addEventListener('keydown',function(e){if(e.key=='Enter')entrar()});
+if(sessionStorage.getItem('qbv_clave'))cargar();
+</script>
+</body>
+</html>
