@@ -58,6 +58,11 @@ a{color:#143c8c}
     <div class="stat"><b id="sOk">0</b><span>Válidos</span></div>
     <div class="stat"><b id="sNo">0</b><span>Rechazados</span></div>
     <div class="stat"><b id="sPer">0</b><span>Personas</span></div>
+    <div class="stat"><b id="sAl" style="color:#b3261e">0</b><span>Alertas de celular</span></div>
+  </div>
+  <div class="card" id="alertas" style="margin-top:16px;display:none">
+    <h3 style="margin:0 0 8px;font-size:16px;color:#b3261e">Alertas: intentos de fichar con un celular ajeno</h3>
+    <div class="tablewrap"><table><thead><tr><th>Fecha</th><th>Hora</th><th>Para quién</th><th>Sucursal</th><th>Movimiento</th><th>Detalle</th></tr></thead><tbody id="tal"></tbody></table></div>
   </div>
   <div class="card tablewrap" style="margin-top:16px">
     <table><thead><tr>
@@ -65,11 +70,16 @@ a{color:#143c8c}
     </tr></thead><tbody id="tb"></tbody></table>
     <div id="vacio" style="padding:20px;color:#55607a;display:none">No hay fichajes con esos filtros.</div>
   </div>
+  <div class="card tablewrap">
+    <h3 style="margin:0 0 8px;font-size:16px">Empleados</h3>
+    <p style="margin:0 0 10px;font-size:13px;color:#55607a">Cada persona queda atada al primer celular con el que ficha bien. Si cambia de celular o borra los datos del navegador, tocá <b>Liberar celular</b> y el próximo fichaje registra el nuevo.</p>
+    <table><thead><tr><th>Nombre</th><th>Oficina</th><th>Celular</th><th>Último fichaje válido</th><th></th></tr></thead><tbody id="temp"></tbody></table>
+  </div>
 </main>
 
 <script>
 var API='https://script.google.com/macros/s/AKfycbyKcgUYjR8Gq9-d9gawu_-TKxkP42qI3levvLrp_5elh_IMGFnQ_MONfNtiDFn0Ytu5Wg/exec';
-var DATA=[], VISTA=[];
+var DATA=[], VISTA=[], EMP=[], SUCS=[];
 function $(i){return document.getElementById(i)}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function iso(f){var p=String(f).split('/');return p.length==3?p[2]+'-'+('0'+p[1]).slice(-2)+'-'+('0'+p[0]).slice(-2):''}
@@ -80,12 +90,13 @@ function cargar(){
   fetch(API,{method:'POST',body:JSON.stringify({action:'listar',clave:c})}).then(function(r){return r.json()}).then(function(r){
     if(!r.ok){sessionStorage.removeItem('qbv_clave');$('app').style.display='none';$('login').style.display='block';$('lmsg').className='msg err';$('lmsg').textContent=r.msg||'Clave incorrecta';return}
     $('login').style.display='none';$('app').style.display='block';
-    DATA=r.rows.filter(function(x){return x[0]}).map(function(x){return {fecha:x[0],iso:iso(x[0]),hora:x[1],persona:nombre(x[2]),suc:x[4],mov:x[5],ubic:x[6],prec:x[7],dist:x[8],res:x[9]}});
+    DATA=r.rows.filter(function(x){return x[0]}).map(function(x){return {fecha:x[0],iso:iso(x[0]),hora:x[1],persona:nombre(x[2]),suc:x[4],mov:x[5],ubic:x[6],prec:x[7],dist:x[8],res:x[9]||'',dev:x[10]||'',alerta:x[11]||''}});
     DATA.sort(function(a,b){return (b.iso+b.hora).localeCompare(a.iso+a.hora)});
-    opciones('fsuc','suc');opciones('fper','persona');opciones('fmov','mov');filtrar();
+    EMP=r.empleados||[];SUCS=r.sucursales||[];
+    opciones('fsuc','suc',SUCS);opciones('fper','persona',EMP.map(function(e){return nombre(e.n)}));opciones('fmov','mov',['Ingreso','Egreso','Salida a almorzar','Regreso de almuerzo']);filtrar();empleados();
   }).catch(function(){$('lmsg').className='msg err';$('lmsg').textContent='No se pudo conectar. Probá de nuevo.'});
 }
-function opciones(id,campo){var s=$(id),v=s.value,u={};DATA.forEach(function(d){if(d[campo])u[d[campo]]=1});
+function opciones(id,campo,extra){var s=$(id),v=s.value,u={};(extra||[]).forEach(function(k){if(k)u[k]=1});DATA.forEach(function(d){if(d[campo])u[d[campo]]=1});
   s.length=1;Object.keys(u).sort().forEach(function(k){var o=document.createElement('option');o.value=o.textContent=k;s.appendChild(o)});s.value=u[v]?v:''}
 function filtrar(){
   var d1=$('fdesde').value,d2=$('fhasta').value,su=$('fsuc').value,pe=$('fper').value,mo=$('fmov').value,re=$('fres').value;
@@ -96,11 +107,19 @@ function filtrar(){
     var dist=Number(d.dist);var dt=isNaN(dist)?esc(d.dist):(dist>=1000?(dist/1000).toFixed(1)+' km':dist+' m');
     h+='<tr><td>'+esc(d.fecha)+'</td><td>'+esc(d.hora)+'</td><td>'+esc(d.persona)+'</td><td>'+esc(d.suc)+'</td><td>'+esc(d.mov)+'</td><td class="'+(d.res.indexOf('OK')==0?'ok':'no')+'">'+(d.res=='OK'?'Válido':d.res.indexOf('OK')==0?'Válido · celular distinto':esc(d.res.replace('RECHAZADO: ','Rechazado: ')))+'</td><td>'+dt+'</td><td>'+esc(d.prec)+' m</td><td>'+m+'</td></tr>'});
   $('tb').innerHTML=h;$('vacio').style.display=VISTA.length?'none':'block';
+  var al=VISTA.filter(function(d){return d.res.indexOf('RECHAZADO: celular')==0});
+  $('sAl').textContent=al.length;$('alertas').style.display=al.length?'block':'none';
+  $('tal').innerHTML=al.map(function(d){return '<tr><td>'+esc(d.fecha)+'</td><td>'+esc(d.hora)+'</td><td>'+esc(d.persona)+'</td><td>'+esc(d.suc)+'</td><td>'+esc(d.mov)+'</td><td class="no">'+esc(d.res.indexOf('otra persona')>0?d.alerta.replace('Celular registrado a ','Usó el celular de '):'Usó un celular que no es el suyo')+'</td></tr>'}).join('');
   $('sTot').textContent=VISTA.length;$('sOk').textContent=ok;$('sNo').textContent=VISTA.length-ok;$('sPer').textContent=Object.keys(per).length;
 }
+function empleados(){
+  $('temp').innerHTML=EMP.filter(function(e){return e.ficha}).map(function(e,i){return '<tr><td>'+esc(nombre(e.n))+'</td><td>'+esc(e.oficina)+'</td><td>'+(e.celular?'<span class="ok">Vinculado</span>':'<span style="color:#55607a">Sin vincular</span>')+'</td><td>'+esc(e.ultimo)+'</td><td>'+(e.celular?'<button class="sec" data-n="'+esc(e.n)+'" onclick="liberar(this)">Liberar celular</button>':'')+'</td></tr>'}).join('');
+}
+function liberar(b){var n=b.getAttribute('data-n');if(!confirm('¿Liberar el celular de '+nombre(n)+'? Su próximo fichaje válido va a registrar el celular nuevo.'))return;
+  b.disabled=true;fetch(API,{method:'POST',body:JSON.stringify({action:'liberar',clave:sessionStorage.getItem('qbv_clave'),nombre:n})}).then(function(r){return r.json()}).then(function(r){if(!r.ok)alert(r.msg||'No se pudo liberar.');cargar()}).catch(function(){b.disabled=false;alert('No se pudo conectar.')})}
 function limpiar(){['fdesde','fhasta','fsuc','fper','fmov','fres'].forEach(function(i){$(i).value=''});filtrar()}
-function csv(){var l=[['Fecha','Hora','Persona','Sucursal','Movimiento','Resultado','Distancia (m)','Precision GPS (m)','Ubicacion']];
-  VISTA.forEach(function(d){l.push([d.fecha,d.hora,d.persona,d.suc,d.mov,d.res,d.dist,d.prec,d.ubic])});
+function csv(){var l=[['Fecha','Hora','Persona','Sucursal','Movimiento','Resultado','Distancia (m)','Precision GPS (m)','Ubicacion','Alerta']];
+  VISTA.forEach(function(d){l.push([d.fecha,d.hora,d.persona,d.suc,d.mov,d.res,d.dist,d.prec,d.ubic,d.alerta])});
   var t=l.map(function(r){return r.map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"'}).join(';')}).join('\r\n');
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+t],{type:'text/csv;charset=utf-8'}));a.download='fichajes_qbv.csv';a.click()}
 ['fdesde','fhasta','fsuc','fper','fmov','fres'].forEach(function(i){$(i).addEventListener('change',filtrar)});

@@ -31,7 +31,7 @@
   <div class="card">
     <label for="nombre">Nombre y apellido</label>
     <input id="nombre" autocomplete="name" placeholder="Ej: Natalia Perez">
-    <label for="pin">PIN (últimos 4 números de tu DNI)</label>
+    <label for="pin">PIN personal (te lo da RRHH)</label>
     <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="••••">
     <label for="suc">Sucursal</label>
     <select id="suc"><option value="">Cargando…</option></select>
@@ -61,7 +61,7 @@
       <li>Volvé a tocar el botón.</li>
     </ol>
   </div>
-  <div class="foot">La hora la toma el sistema. Si el celular pregunta, tocá "Permitir ubicación".</div>
+  <div class="foot">Fichá siempre desde tu propio celular: queda registrado a tu nombre. La hora la toma el sistema. Si el celular pregunta, tocá "Permitir ubicación".</div>
 </div>
 
 <script>
@@ -69,7 +69,7 @@ var $ = function(id){return document.getElementById(id);};
 function show(t, cls){var m=$('msg'); m.className='msg '+cls; m.textContent=t; m.style.display='block';}
 function store(k,v){try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v);}catch(e){return null;}}
 $('nombre').value = store('fq_nombre') || '';
-$('pin').value = store('fq_pin') || '';
+$('pin').value = store('fq_pin2') || '';
 var DEV = store('fq_dev'); if(!DEV){ DEV = 'd'+Date.now().toString(36)+Math.random().toString(36).slice(2,10); store('fq_dev', DEV); }
 
 var pre = '';
@@ -103,7 +103,7 @@ function go(mov){
       .then(function(res){ return res.json(); })
       .then(function(r){
         setBusy(false);
-        if (r.ok) { store('fq_pin',pin); show('✔ '+(r.nombre?r.nombre+': ':'')+mov+' registrado a las '+r.hora+' en '+suc+'.','ok'); }
+        if (r.ok) { store('fq_pin2',pin); show('✔ '+(r.nombre?r.nombre+': ':'')+mov+' registrado a las '+r.hora+' en '+suc+'.','ok'); }
         else show(r.msg || ('No se registró: estás a '+r.dist+' m de '+suc+'. Fichá cuando estés en la sucursal.'),'err');
       })
       .catch(function(e){ setBusy(false); show('Error al registrar. Revisá tu conexión y probá de nuevo.','err'); });
